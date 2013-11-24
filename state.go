@@ -17,13 +17,14 @@ type AppendEntriesResponse struct {
 }
 
 type RequestVoteRequest struct {
-	Term          int  `json:"term"`
 	CandidateName Name `json:"candidateName"`
+	Term          int  `json:"term"`
 	LastLogIndex  int  `json:"lastLogIndex"`
 	LastLogTerm   int  `json:"lastLogTerm"`
 }
 
 type RequestVoteResponse struct {
+	CandidateName Name `json:"candidateName"`
 	Term        int  `json:"term"`
 	VoteGranted bool `json:"voteGranted"`
 }
@@ -44,6 +45,7 @@ var (
 	// persistent state
 	currentTerm int = 0
 	votedFor    Name
+	votes       map[Name]bool
 
 	// volatile state
 	commitIndex int = 0
@@ -64,12 +66,29 @@ func init() {
 	fmt.Printf("name=%v\n", name)
 }
 
-func RunState(server *Server) {
+func RunState(server *Server, clients *Server) {
 	for {
 		select {
-		case <-server.AppendEntriesRequestChan:
-			fmt.Printf("fuck\n")
+		// peers responding to our append entries requests
+		case <-clients.AppendEntriesResponseChan:
 
+		// peers responding to our vote requests
+		case response := <-clients.RequestVoteResponseChan:
+			// discard if we're not a candidate
+			if state == CANDIDATE {
+				votes[response.CandidateName] = true
+				fmt.Printf("num_votes=%v\n", len(votes))
+
+				// compare number of votes + 1 for self
+				if len(votes) + 1 > len(conf.peerUrls) / 2 {
+					setState(LEADER)
+				}
+			}
+
+		// leader requesting an append entries
+		case <-server.AppendEntriesRequestChan:
+
+		// peers requesting votes
 		case request := <-server.RequestVoteRequestChan:
 			fmt.Printf("vote_requested name=%v\n", request.CandidateName)
 
@@ -80,13 +99,21 @@ func RunState(server *Server) {
 			//         client
 			//     (2) candidate's log is at least as up-to-date as ours
 			if (votedFor == "" || votedFor == request.CandidateName) && request.LastLogTerm >= currentTerm && request.LastLogIndex >= commitIndex {
-				response = RequestVoteResponse{Term: currentTerm, VoteGranted: true}
+				response = RequestVoteResponse{
+					CandidateName: name,
+					Term: currentTerm,
+					VoteGranted: true,
+				}
 			} else {
-				response = RequestVoteResponse{Term: currentTerm, VoteGranted: false}
+				response = RequestVoteResponse{
+					CandidateName: name,
+					Term: currentTerm,
+					VoteGranted: false,
+				}
 			}
 			server.RequestVoteResponseChan <- response
 
-		// on election timeout, convert to candidate, start election
+		// election timeout; convert to candidate, start election
 		case <-time.After(ELECTION_TIMEOUT):
 			startElection()
 		}
@@ -96,6 +123,11 @@ func RunState(server *Server) {
 func setState(newState State) {
 	state = newState
 	fmt.Printf("state=%v\n", newState)
+
+	votedFor = ""
+
+	votes = make(map[Name]bool)
+	fmt.Printf("num_votes=%v\n", len(votes))
 }
 
 func setTerm(newTerm int) {
@@ -112,6 +144,16 @@ func startElection() {
 	fmt.Printf("start_election\n")
 	setState(CANDIDATE)
 	setTerm(currentTerm + 1)
+
 	// vote for self
 	setVote(name)
+
+	request := RequestVoteRequest{
+		Term: currentTerm,
+		CandidateName: name,
+		LastLogIndex: commitIndex,
+		LastLogTerm: log[commitIndex].term,
+	}
+	// request vote from other clients
+	clients.RequestVoteRequestChan <- request
 }

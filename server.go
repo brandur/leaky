@@ -24,9 +24,9 @@ var (
 )
 
 func RunServer() {
-	fmt.Printf("port=%v\n", 5100)
+	fmt.Printf("addr=%v\n", conf.addr)
 	http.Handle("/", initRouter())
-	http.ListenAndServe(":5100", nil)
+	http.ListenAndServe(conf.addr, nil)
 }
 
 func init() {

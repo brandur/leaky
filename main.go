@@ -4,8 +4,9 @@ import (
 )
 
 func main() {
-	addLogEntry(LogEntry{term: 1, operation: PUT, data: "foo"})
+	addLogEntry(LogEntry{term: currentTerm, operation: PUT, data: "foo"})
 
-	go RunState(&server)
+	go RunState(&server, &clients)
+	go RunClient()
 	RunServer()
 }
