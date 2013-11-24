@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/pat"
 	"io/ioutil"
@@ -38,16 +39,29 @@ func init() {
 	}
 }
 
-func appendEntriesHandler(w http.ResponseWriter, r *http.Request) {
-    requestData, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		panic(err)
-	}
+func buildHandler(handler func ([]byte) ([]byte, error)) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		requestData, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			panic(err)
+		}
 
+		responseData, err := handler(requestData)
+		if err != nil {
+			http.Error(w, encodeError(err), http.StatusInternalServerError)
+		}
+
+		if _, err = w.Write(responseData); err != nil {
+			http.Error(w, encodeError(err), http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func handleAppendEntries(requestData []byte) ([]byte, error) {
 	request := AppendEntriesRequest{}
 	if err := json.Unmarshal(requestData, &request); err != nil {
-		http.Error(w, encodeError("Invalid JSON."), http.StatusBadRequest)
-		return
+		return nil, err
 	}
 
 	server.AppendEntriesRequestChan <- request
@@ -55,18 +69,33 @@ func appendEntriesHandler(w http.ResponseWriter, r *http.Request) {
 
     responseData, err := json.Marshal(response)
 	if err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
+		return nil, err
 	}
-
-	if _, err = w.Write(responseData); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
+	return responseData, nil
 }
 
-func encodeError(message string) string {
-	serverError := ServerError{Message: message}
+func handleRequestVote(requestData []byte) ([]byte, error) {
+	request := RequestVoteRequest{}
+	if err := json.Unmarshal(requestData, &request); err != nil {
+		return nil, err
+	}
+
+	if request.CandidateName == "" {
+		return nil, errors.New("Missing field: \"candidateName\".")
+	}
+
+	server.RequestVoteRequestChan <- request
+	response := <-server.RequestVoteResponseChan
+
+    responseData, err := json.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	return responseData, nil
+}
+
+func encodeError(err error) string {
+	serverError := ServerError{Message: err.Error()}
     responseData, err := json.Marshal(serverError)
 	if err != nil {
 		panic(err)
@@ -76,39 +105,7 @@ func encodeError(message string) string {
 
 func initRouter() *pat.Router {
 	router := pat.New()
-	router.Post("/append-entries", appendEntriesHandler)
-	router.Post("/request-vote", requestVoteHandler)
+	router.Post("/append-entries", buildHandler(handleAppendEntries))
+	router.Post("/request-vote", buildHandler(handleRequestVote))
 	return router
-}
-
-func requestVoteHandler(w http.ResponseWriter, r *http.Request) {
-    requestData, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	request := RequestVoteRequest{}
-	if err := json.Unmarshal(requestData, &request); err != nil {
-		http.Error(w, encodeError("Invalid JSON."), http.StatusBadRequest)
-		return
-	}
-
-	if request.CandidateName == "" {
-		http.Error(w, encodeError("Missing field: \"candidateName\"."), http.StatusBadRequest)
-		return
-	}
-
-	server.RequestVoteRequestChan <- request
-	response := <-server.RequestVoteResponseChan
-
-    responseData, err := json.Marshal(response)
-	if err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
-
-	if _, err = w.Write(responseData); err != nil {
-		http.Error(w, "", http.StatusInternalServerError)
-		return
-	}
 }
