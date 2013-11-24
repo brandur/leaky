@@ -25,12 +25,12 @@ type RequestVoteRequest struct {
 
 type RequestVoteResponse struct {
 	CandidateName Name `json:"candidateName"`
-	Term        int  `json:"term"`
-	VoteGranted bool `json:"voteGranted"`
+	Term          int  `json:"term"`
+	VoteGranted   bool `json:"voteGranted"`
 }
 
 const (
-	ELECTION_TIMEOUT time.Duration = 2 * time.Second
+	ELECTION_TIMEOUT  time.Duration = 2 * time.Second
 	HEARTBEAT_TIMEOUT time.Duration = 1 * time.Second
 
 	CANDIDATE State = "candidate"
@@ -91,7 +91,7 @@ func runAsCandidate() {
 				fmt.Printf("num_votes=%v\n", len(votes))
 
 				// compare number of votes + 1 for self
-				if len(votes) + 1 > len(conf.peerUrls) / 2 {
+				if len(votes)+1 > len(conf.peerUrls)/2 {
 					setState(LEADER)
 				}
 			}
@@ -125,14 +125,14 @@ func runAsFollower() {
 			if (votedFor == "" || votedFor == request.CandidateName) && request.LastLogTerm >= currentTerm && request.LastLogIndex >= commitIndex {
 				response = RequestVoteResponse{
 					CandidateName: name,
-					Term: currentTerm,
-					VoteGranted: true,
+					Term:          currentTerm,
+					VoteGranted:   true,
 				}
 			} else {
 				response = RequestVoteResponse{
 					CandidateName: name,
-					Term: currentTerm,
-					VoteGranted: false,
+					Term:          currentTerm,
+					VoteGranted:   false,
 				}
 			}
 			server.RequestVoteResponseChan <- response
@@ -187,10 +187,10 @@ func startElection() {
 	setVote(name)
 
 	request := RequestVoteRequest{
-		Term: currentTerm,
+		Term:          currentTerm,
 		CandidateName: name,
-		LastLogIndex: commitIndex,
-		LastLogTerm: log[commitIndex].term,
+		LastLogIndex:  commitIndex,
+		LastLogTerm:   log[commitIndex].term,
 	}
 	// request vote from other clients
 	clients.RequestVoteRequestChan <- request

@@ -1,7 +1,6 @@
 package main
 
-import (
-)
+import ()
 
 func main() {
 	//addLogEntry(LogEntry{term: currentTerm, operation: PUT, data: "foo"})

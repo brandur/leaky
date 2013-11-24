@@ -6,7 +6,7 @@ import (
 )
 
 type Conf struct {
-	addr string
+	addr     string
 	peerUrls []string
 }
 

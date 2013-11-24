@@ -15,19 +15,19 @@ var (
 func RunClient() {
 	for {
 		select {
-			case request := <-clients.AppendEntriesRequestChan:
-				requestData, err := json.Marshal(request)
-				if err != nil {
-					panic(err)
-				}
-				broadcast("/append-entries", requestData, handleAppendEntriesResponse)
+		case request := <-clients.AppendEntriesRequestChan:
+			requestData, err := json.Marshal(request)
+			if err != nil {
+				panic(err)
+			}
+			broadcast("/append-entries", requestData, handleAppendEntriesResponse)
 
-			case request := <-clients.RequestVoteRequestChan:
-				requestData, err := json.Marshal(request)
-				if err != nil {
-					panic(err)
-				}
-				broadcast("/request-vote", requestData, handleRequestVoteResponse)
+		case request := <-clients.RequestVoteRequestChan:
+			requestData, err := json.Marshal(request)
+			if err != nil {
+				panic(err)
+			}
+			broadcast("/request-vote", requestData, handleRequestVoteResponse)
 		}
 	}
 }
@@ -48,8 +48,8 @@ func broadcast(path string, data []byte, handler func([]byte)) {
 }
 
 func connectAndSend(url string, path string, data []byte, handler func([]byte)) {
-    buffer := bytes.NewBuffer(data)
-	r, err := http.Post(url + path, "application/json", buffer)
+	buffer := bytes.NewBuffer(data)
+	r, err := http.Post(url+path, "application/json", buffer)
 	if err != nil {
 		fmt.Printf("send_error peer_url=%v err=\"%v\"", url, err)
 		return

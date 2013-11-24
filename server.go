@@ -39,7 +39,7 @@ func init() {
 	}
 }
 
-func buildHandler(handler func ([]byte) ([]byte, error)) func(w http.ResponseWriter, r *http.Request) {
+func buildHandler(handler func([]byte) ([]byte, error)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestData, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -67,7 +67,7 @@ func handleAppendEntries(requestData []byte) ([]byte, error) {
 	server.AppendEntriesRequestChan <- request
 	response := <-server.AppendEntriesResponseChan
 
-    responseData, err := json.Marshal(response)
+	responseData, err := json.Marshal(response)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +87,7 @@ func handleRequestVote(requestData []byte) ([]byte, error) {
 	server.RequestVoteRequestChan <- request
 	response := <-server.RequestVoteResponseChan
 
-    responseData, err := json.Marshal(response)
+	responseData, err := json.Marshal(response)
 	if err != nil {
 		return nil, err
 	}
@@ -96,7 +96,7 @@ func handleRequestVote(requestData []byte) ([]byte, error) {
 
 func encodeError(err error) string {
 	serverError := ServerError{Message: err.Error()}
-    responseData, err := json.Marshal(serverError)
+	responseData, err := json.Marshal(serverError)
 	if err != nil {
 		panic(err)
 	}
