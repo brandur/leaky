@@ -6,7 +6,7 @@ import (
 func main() {
 	addLogEntry(LogEntry{term: currentTerm, operation: PUT, data: "foo"})
 
-	go RunState(&server, &clients)
+	go RunState()
 	go RunClient()
 	RunServer()
 }

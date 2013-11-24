@@ -31,6 +31,7 @@ type RequestVoteResponse struct {
 
 const (
 	ELECTION_TIMEOUT time.Duration = 2 * time.Second
+	HEARTBEAT_TIMEOUT time.Duration = 1 * time.Second
 
 	CANDIDATE State = "candidate"
 	FOLLOWER  State = "follower"
@@ -66,12 +67,22 @@ func init() {
 	fmt.Printf("name=%v\n", name)
 }
 
-func RunState(server *Server, clients *Server) {
+func RunState() {
+	for {
+		switch {
+		case state == CANDIDATE:
+			runAsCandidate()
+		case state == FOLLOWER:
+			runAsFollower()
+		case state == LEADER:
+			runAsLeader()
+		}
+	}
+}
+
+func runAsCandidate() {
 	for {
 		select {
-		// peers responding to our append entries requests
-		case <-clients.AppendEntriesResponseChan:
-
 		// peers responding to our vote requests
 		case response := <-clients.RequestVoteResponseChan:
 			// discard if we're not a candidate
@@ -85,6 +96,19 @@ func RunState(server *Server, clients *Server) {
 				}
 			}
 
+		// leader requesting an append entries
+		case <-server.AppendEntriesRequestChan:
+
+		// election timeout; convert to candidate, start election
+		case <-time.After(ELECTION_TIMEOUT):
+			startElection()
+		}
+	}
+}
+
+func runAsFollower() {
+	for {
+		select {
 		// leader requesting an append entries
 		case <-server.AppendEntriesRequestChan:
 
@@ -116,6 +140,20 @@ func RunState(server *Server, clients *Server) {
 		// election timeout; convert to candidate, start election
 		case <-time.After(ELECTION_TIMEOUT):
 			startElection()
+		}
+	}
+}
+
+func runAsLeader() {
+	for {
+		select {
+		// peers responding to our append entries requests
+		case <-clients.AppendEntriesResponseChan:
+
+		// send heartbeat to followers
+		case <-time.After(HEARTBEAT_TIMEOUT):
+			request := AppendEntriesRequest{}
+			clients.AppendEntriesRequestChan <- request
 		}
 	}
 }

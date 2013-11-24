@@ -38,6 +38,33 @@ func init() {
 	}
 }
 
+func appendEntriesHandler(w http.ResponseWriter, r *http.Request) {
+    requestData, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		panic(err)
+	}
+
+	request := AppendEntriesRequest{}
+	if err := json.Unmarshal(requestData, &request); err != nil {
+		http.Error(w, encodeError("Invalid JSON."), http.StatusBadRequest)
+		return
+	}
+
+	server.AppendEntriesRequestChan <- request
+	response := <-server.AppendEntriesResponseChan
+
+    responseData, err := json.Marshal(response)
+	if err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
+	if _, err = w.Write(responseData); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+}
+
 func encodeError(message string) string {
 	serverError := ServerError{Message: message}
     responseData, err := json.Marshal(serverError)
@@ -49,6 +76,7 @@ func encodeError(message string) string {
 
 func initRouter() *pat.Router {
 	router := pat.New()
+	router.Post("/append-entries", appendEntriesHandler)
 	router.Post("/request-vote", requestVoteHandler)
 	return router
 }

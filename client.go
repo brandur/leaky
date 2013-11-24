@@ -15,7 +15,12 @@ var (
 func RunClient() {
 	for {
 		select {
-			case <-clients.AppendEntriesRequestChan:
+			case request := <-clients.AppendEntriesRequestChan:
+				requestData, err := json.Marshal(request)
+				if err != nil {
+					panic(err)
+				}
+				broadcast("/append-entries", requestData, handleAppendEntriesResponse)
 
 			case request := <-clients.RequestVoteRequestChan:
 				requestData, err := json.Marshal(request)
@@ -56,6 +61,14 @@ func connectAndSend(url string, path string, data []byte, handler func([]byte)) 
 	}
 
 	handler(responseData)
+}
+
+func handleAppendEntriesResponse(responseData []byte) {
+	response := AppendEntriesResponse{}
+	if err := json.Unmarshal(responseData, &response); err != nil {
+		panic(err)
+	}
+	clients.AppendEntriesResponseChan <- response
 }
 
 func handleRequestVoteResponse(responseData []byte) {
