@@ -91,6 +91,10 @@ func runAsCandidate() {
 			// compare number of votes + 1 for self
 			if len(votes)+1 > len(conf.peerUrls)/2 {
 				setState(LEADER)
+
+				// as we transition into a leadership role, send heartbeat to
+				// peers to tell them what's happened
+				sendHeartbeat()
 			}
 
 		// leader requesting an append entries
@@ -147,12 +151,15 @@ func runAsLeader() {
 		// peers responding to our append entries requests
 		case <-clients.AppendEntriesResponseChan:
 
-		// send heartbeat to followers
 		case <-time.After(HEARTBEAT_TIMEOUT):
-			request := AppendEntriesRequest{}
-			clients.AppendEntriesRequestChan <- request
+			sendHeartbeat()
 		}
 	}
+}
+
+func sendHeartbeat() {
+	request := AppendEntriesRequest{}
+	clients.AppendEntriesRequestChan <- request
 }
 
 func setState(newState State) {
