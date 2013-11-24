@@ -85,15 +85,12 @@ func runAsCandidate() {
 		select {
 		// peers responding to our vote requests
 		case response := <-clients.RequestVoteResponseChan:
-			// discard if we're not a candidate
-			if state == CANDIDATE {
-				votes[response.CandidateName] = true
-				fmt.Printf("num_votes=%v\n", len(votes))
+			votes[response.CandidateName] = true
+			fmt.Printf("num_votes=%v\n", len(votes))
 
-				// compare number of votes + 1 for self
-				if len(votes)+1 > len(conf.peerUrls)/2 {
-					setState(LEADER)
-				}
+			// compare number of votes + 1 for self
+			if len(votes)+1 > len(conf.peerUrls)/2 {
+				setState(LEADER)
 			}
 
 		// leader requesting an append entries
