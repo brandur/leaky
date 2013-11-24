@@ -88,12 +88,7 @@ func RunState(server *Server) {
 
 		// on election timeout, convert to candidate, start election
 		case <-time.After(ELECTION_TIMEOUT):
-			if state != CANDIDATE {
-				setState(CANDIDATE)
-				setTerm(currentTerm + 1)
-				// vote for self
-				setVote(name)
-			}
+			startElection()
 		}
 	}
 }
@@ -111,4 +106,12 @@ func setTerm(newTerm int) {
 func setVote(vote Name) {
 	votedFor = vote
 	fmt.Printf("vote=%v\n", vote)
+}
+
+func startElection() {
+	fmt.Printf("start_election\n")
+	setState(CANDIDATE)
+	setTerm(currentTerm + 1)
+	// vote for self
+	setVote(name)
 }
