@@ -71,8 +71,19 @@ func RunState(server *Server) {
 			fmt.Printf("fuck\n")
 
 		case request := <-server.RequestVoteRequestChan:
-			fmt.Printf("received request for vote %v\n", request)
-			response := RequestVoteResponse{Term: 1, VoteGranted: true}
+			fmt.Printf("vote_requested name=%v\n", request.CandidateName)
+
+			var response RequestVoteResponse
+
+			// grant vote if:
+			//     (1) we haven't voted or if we've previously voted for this
+			//         client
+			//     (2) candidate's log is at least as up-to-date as ours
+			if (votedFor == "" || votedFor == request.CandidateName) && request.LastLogTerm >= currentTerm && request.LastLogIndex >= commitIndex {
+				response = RequestVoteResponse{Term: currentTerm, VoteGranted: true}
+			} else {
+				response = RequestVoteResponse{Term: currentTerm, VoteGranted: false}
+			}
 			server.RequestVoteResponseChan <- response
 
 		// on election timeout, convert to candidate, start election
