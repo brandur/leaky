@@ -15,6 +15,10 @@ type Server struct {
 	RequestVoteResponseChan   chan RequestVoteResponse
 }
 
+type ServerError struct {
+	Message string `json:"message"`
+}
+
 var (
 	server Server
 )
@@ -34,6 +38,15 @@ func init() {
 	}
 }
 
+func encodeError(message string) string {
+	serverError := ServerError{Message: message}
+    responseData, err := json.Marshal(serverError)
+	if err != nil {
+		panic(err)
+	}
+	return string(responseData)
+}
+
 func initRouter() *pat.Router {
 	router := pat.New()
 	router.Post("/request-vote", requestVoteHandler)
@@ -48,7 +61,13 @@ func requestVoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	request := RequestVoteRequest{}
 	if err := json.Unmarshal(requestData, &request); err != nil {
-		panic(err)
+		http.Error(w, encodeError("Invalid JSON."), http.StatusBadRequest)
+		return
+	}
+
+	if request.CandidateName == "" {
+		http.Error(w, encodeError("Missing field: \"candidateName\"."), http.StatusBadRequest)
+		return
 	}
 
 	server.RequestVoteRequestChan <- request
@@ -56,10 +75,12 @@ func requestVoteHandler(w http.ResponseWriter, r *http.Request) {
 
     responseData, err := json.Marshal(response)
 	if err != nil {
-		panic(err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
 	}
 
 	if _, err = w.Write(responseData); err != nil {
-		panic(err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
 	}
 }
