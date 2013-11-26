@@ -20,18 +20,8 @@ type ServerError struct {
 	Message string `json:"message"`
 }
 
-var (
-	server Server
-)
-
-func RunServer() {
-	fmt.Printf("addr=%v\n", conf.addr)
-	http.Handle("/", initRouter())
-	http.ListenAndServe(conf.addr, nil)
-}
-
-func init() {
-	server = Server{
+func newServer() *Server {
+	return &Server{
 		AppendEntriesRequestChan:  make(chan AppendEntriesRequest),
 		AppendEntriesResponseChan: make(chan AppendEntriesResponse),
 		RequestVoteRequestChan:    make(chan RequestVoteRequest),
@@ -39,33 +29,33 @@ func init() {
 	}
 }
 
-func buildHandler(handler func([]byte) ([]byte, error)) func(w http.ResponseWriter, r *http.Request) {
+func (s *Server) buildHandler(handler func(*Server, []byte) ([]byte, error)) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		requestData, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			panic(err)
 		}
 
-		responseData, err := handler(requestData)
+		responseData, err := handler(s, requestData)
 		if err != nil {
-			http.Error(w, encodeError(err), http.StatusInternalServerError)
+			http.Error(w, s.encodeError(err), http.StatusInternalServerError)
 		}
 
 		if _, err = w.Write(responseData); err != nil {
-			http.Error(w, encodeError(err), http.StatusInternalServerError)
+			http.Error(w, s.encodeError(err), http.StatusInternalServerError)
 			return
 		}
 	}
 }
 
-func handleAppendEntries(requestData []byte) ([]byte, error) {
+func handleAppendEntries(s *Server, requestData []byte) ([]byte, error) {
 	request := AppendEntriesRequest{}
 	if err := json.Unmarshal(requestData, &request); err != nil {
 		return nil, err
 	}
 
-	server.AppendEntriesRequestChan <- request
-	response := <-server.AppendEntriesResponseChan
+	s.AppendEntriesRequestChan <- request
+	response := <-s.AppendEntriesResponseChan
 
 	responseData, err := json.Marshal(response)
 	if err != nil {
@@ -74,7 +64,7 @@ func handleAppendEntries(requestData []byte) ([]byte, error) {
 	return responseData, nil
 }
 
-func handleRequestVote(requestData []byte) ([]byte, error) {
+func handleRequestVote(s *Server, requestData []byte) ([]byte, error) {
 	request := RequestVoteRequest{}
 	if err := json.Unmarshal(requestData, &request); err != nil {
 		return nil, err
@@ -84,8 +74,8 @@ func handleRequestVote(requestData []byte) ([]byte, error) {
 		return nil, errors.New("Missing field: \"candidateName\".")
 	}
 
-	server.RequestVoteRequestChan <- request
-	response := <-server.RequestVoteResponseChan
+	s.RequestVoteRequestChan <- request
+	response := <-s.RequestVoteResponseChan
 
 	responseData, err := json.Marshal(response)
 	if err != nil {
@@ -94,7 +84,7 @@ func handleRequestVote(requestData []byte) ([]byte, error) {
 	return responseData, nil
 }
 
-func encodeError(err error) string {
+func (s *Server) encodeError(err error) string {
 	serverError := ServerError{Message: err.Error()}
 	responseData, err := json.Marshal(serverError)
 	if err != nil {
@@ -103,9 +93,15 @@ func encodeError(err error) string {
 	return string(responseData)
 }
 
-func initRouter() *pat.Router {
+func (s *Server) initRouter() *pat.Router {
 	router := pat.New()
-	router.Post("/append-entries", buildHandler(handleAppendEntries))
-	router.Post("/request-vote", buildHandler(handleRequestVote))
+	router.Post("/append-entries", s.buildHandler(handleAppendEntries))
+	router.Post("/request-vote", s.buildHandler(handleRequestVote))
 	return router
+}
+
+func (s *Server) run() {
+	fmt.Printf("addr=%v\n", conf.addr)
+	http.Handle("/", s.initRouter())
+	http.ListenAndServe(conf.addr, nil)
 }
