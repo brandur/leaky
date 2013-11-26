@@ -38,83 +38,92 @@ const (
 	LEADER    State = "leader"
 )
 
-var (
+type StateMachine struct {
+	clients *Server
+	server *Server
+
 	// operational state
 	state State
 	name  Name
 
 	// persistent state
-	currentTerm int = 0
+	currentTerm int
 	votedFor    Name
 	votes       map[Name]bool
 
 	// volatile state
-	commitIndex int = 0
-	lastApplied int = 0
+	commitIndex int
+	lastApplied int
 
 	// volatile state for leader
 	matchIndex []int
 	nextIndex  []int
-)
+}
 
-func init() {
-	setState(FOLLOWER)
+func newStateMachine(clients *Server, server *Server) *StateMachine {
+    s := &StateMachine{}
+
+	s.clients = clients
+	s.server = server
+	s.setState(FOLLOWER)
+
 	id, err := uuid.NewV4()
 	if err != nil {
 		panic(err)
 	}
-	name = Name("leaky-" + id.String())
-	fmt.Printf("name=%v\n", name)
+	s.name = Name("leaky-" + id.String())
+	fmt.Printf("name=%v\n", s.name)
+	return s
 }
 
-func RunState() {
+func (s *StateMachine) run() {
 	for {
 		switch {
-		case state == CANDIDATE:
-			runAsCandidate()
-		case state == FOLLOWER:
-			runAsFollower()
-		case state == LEADER:
-			runAsLeader()
+		case s.state == CANDIDATE:
+			s.runAsCandidate()
+		case s.state == FOLLOWER:
+			s.runAsFollower()
+		case s.state == LEADER:
+			s.runAsLeader()
 		}
 	}
 }
 
-func runAsCandidate() {
+func (s *StateMachine) runAsCandidate() {
 	for {
 		select {
 		// peers responding to our vote requests
-		case response := <-clients.RequestVoteResponseChan:
-			votes[response.CandidateName] = true
-			fmt.Printf("num_votes=%v\n", len(votes))
+		case response := <-s.clients.RequestVoteResponseChan:
+			s.votes[response.CandidateName] = true
+			fmt.Printf("num_votes=%v\n", len(s.votes))
 
 			// compare number of votes + 1 for self
-			if len(votes)+1 > len(conf.peerUrls)/2 {
-				setState(LEADER)
+			if len(s.votes)+1 > len(conf.peerUrls)/2 {
+				s.setState(LEADER)
 
 				// as we transition into a leadership role, send heartbeat to
 				// peers to tell them what's happened
-				sendHeartbeat()
+				s.sendHeartbeat()
 			}
 
 		// leader requesting an append entries
-		case <-server.AppendEntriesRequestChan:
+		case <-s.server.AppendEntriesRequestChan:
 
 		// election timeout; convert to candidate, start election
 		case <-time.After(ELECTION_TIMEOUT):
-			startElection()
+			s.startElection()
 		}
 	}
 }
 
-func runAsFollower() {
+func (s *StateMachine) runAsFollower() {
 	for {
 		select {
 		// leader requesting an append entries
-		case <-server.AppendEntriesRequestChan:
+		case <-s.server.AppendEntriesRequestChan:
 
 		// peers requesting votes
-		case request := <-server.RequestVoteRequestChan:
+		case request := <-s.server.RequestVoteRequestChan:
 			fmt.Printf("vote_requested name=%v\n", request.CandidateName)
 
 			var response RequestVoteResponse
@@ -123,79 +132,79 @@ func runAsFollower() {
 			//     (1) we haven't voted or if we've previously voted for this
 			//         client
 			//     (2) candidate's log is at least as up-to-date as ours
-			if (votedFor == "" || votedFor == request.CandidateName) && request.LastLogTerm >= currentTerm && request.LastLogIndex >= commitIndex {
+			if (s.votedFor == "" || s.votedFor == request.CandidateName) && request.LastLogTerm >= s.currentTerm && request.LastLogIndex >= s.commitIndex {
 				response = RequestVoteResponse{
-					CandidateName: name,
-					Term:          currentTerm,
+					CandidateName: s.name,
+					Term:          s.currentTerm,
 					VoteGranted:   true,
 				}
 			} else {
 				response = RequestVoteResponse{
-					CandidateName: name,
-					Term:          currentTerm,
+					CandidateName: s.name,
+					Term:          s.currentTerm,
 					VoteGranted:   false,
 				}
 			}
-			server.RequestVoteResponseChan <- response
+			s.server.RequestVoteResponseChan <- response
 
 		// election timeout; convert to candidate, start election
 		case <-time.After(ELECTION_TIMEOUT):
-			startElection()
+			s.startElection()
 		}
 	}
 }
 
-func runAsLeader() {
+func (s *StateMachine) runAsLeader() {
 	for {
 		select {
 		// peers responding to our append entries requests
-		case <-clients.AppendEntriesResponseChan:
+		case <-s.clients.AppendEntriesResponseChan:
 
 		case <-time.After(HEARTBEAT_TIMEOUT):
-			sendHeartbeat()
+			s.sendHeartbeat()
 		}
 	}
 }
 
-func sendHeartbeat() {
+func (s *StateMachine) sendHeartbeat() {
 	request := AppendEntriesRequest{}
-	clients.AppendEntriesRequestChan <- request
+	s.clients.AppendEntriesRequestChan <- request
 }
 
-func setState(newState State) {
-	state = newState
-	fmt.Printf("state=%v\n", newState)
+func (s *StateMachine) setState(state State) {
+	s.state = state
+	fmt.Printf("state=%v\n", state)
 
-	votedFor = ""
+	s.votedFor = ""
 
-	votes = make(map[Name]bool)
-	fmt.Printf("num_votes=%v\n", len(votes))
+	s.votes = make(map[Name]bool)
+	fmt.Printf("num_votes=%v\n", len(s.votes))
 }
 
-func setTerm(newTerm int) {
-	currentTerm = newTerm
-	fmt.Printf("term=%v\n", newTerm)
+func (s *StateMachine) setTerm(term int) {
+	s.currentTerm = term
+	fmt.Printf("term=%v\n", term)
 }
 
-func setVote(vote Name) {
-	votedFor = vote
+func (s *StateMachine) setVote(vote Name) {
+	s.votedFor = vote
 	fmt.Printf("vote=%v\n", vote)
 }
 
-func startElection() {
+func (s *StateMachine) startElection() {
 	fmt.Printf("start_election\n")
-	setState(CANDIDATE)
-	setTerm(currentTerm + 1)
+	s.setState(CANDIDATE)
+	s.setTerm(s.currentTerm + 1)
 
 	// vote for self
-	setVote(name)
+	s.setVote(s.name)
 
 	request := RequestVoteRequest{
-		Term:          currentTerm,
-		CandidateName: name,
-		LastLogIndex:  commitIndex,
-		LastLogTerm:   log[commitIndex].term,
+		Term:          s.currentTerm,
+		CandidateName: s.name,
+		LastLogIndex:  s.commitIndex,
+		LastLogTerm:   log[s.commitIndex].term,
 	}
 	// request vote from other clients
-	clients.RequestVoteRequestChan <- request
+	s.clients.RequestVoteRequestChan <- request
 }
