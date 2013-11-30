@@ -50,6 +50,10 @@ func handleRequestVoteResponse(p *PeerSet, responseData []byte) {
 	p.RequestVoteResponseChan <- response
 }
 
+func (p *PeerSet) len() int {
+	return len(p.set)
+}
+
 func (p *PeerSet) run() {
 	for {
 		select {

@@ -101,7 +101,7 @@ func (s *Server) initRouter() *pat.Router {
 }
 
 func (s *Server) run() {
-	fmt.Printf("addr=%v\n", conf.addr)
+	fmt.Printf("http=%v\n", conf.http)
 	http.Handle("/", s.initRouter())
-	http.ListenAndServe(conf.addr, nil)
+	http.ListenAndServe(conf.http, nil)
 }

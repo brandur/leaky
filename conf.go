@@ -2,19 +2,18 @@ package main
 
 import (
 	"os"
-	"strings"
 )
 
 type Conf struct {
-	addr     string
-	peerUrls []string
+	http    string
+	peerUrl string
 }
 
 var (
 	conf Conf
 )
 
-func mustEnv(n string) string {
+func envRequired(n string) string {
 	v := os.Getenv(n)
 	if len(v) == 0 {
 		panic("Must set: " + n)
@@ -23,6 +22,9 @@ func mustEnv(n string) string {
 }
 
 func init() {
-	conf.addr = mustEnv("ADDR")
-	conf.peerUrls = strings.Split(mustEnv("PEER_URLS"), ",")
+	conf.http = os.Getenv("HTTP")
+	if conf.http == "" {
+		conf.http = ":3131"
+	}
+	conf.peerUrl = envRequired("PEER_URL")
 }

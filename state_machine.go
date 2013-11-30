@@ -98,7 +98,7 @@ func (s *StateMachine) runAsCandidate() {
 			fmt.Printf("num_votes=%v\n", len(s.votes))
 
 			// compare number of votes + 1 for self
-			if len(s.votes)+1 > len(conf.peerUrls)/2 {
+			if len(s.votes)+1 > s.peerSet.len()/2 {
 				s.setState(LEADER)
 
 				// as we transition into a leadership role, send heartbeat to
