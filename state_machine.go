@@ -40,7 +40,7 @@ const (
 
 type StateMachine struct {
 	peerSet *PeerSet
-	server *Server
+	server  *Server
 
 	// operational state
 	state State
@@ -61,7 +61,7 @@ type StateMachine struct {
 }
 
 func newStateMachine(peerSet *PeerSet, server *Server) *StateMachine {
-    s := &StateMachine{}
+	s := &StateMachine{}
 
 	s.peerSet = peerSet
 	s.server = server

@@ -5,13 +5,12 @@ import (
 )
 
 type PeerSet struct {
-	set []Client
+	set                       []Client
 	AppendEntriesRequestChan  chan AppendEntriesRequest
 	AppendEntriesResponseChan chan AppendEntriesResponse
 	RequestVoteRequestChan    chan RequestVoteRequest
 	RequestVoteResponseChan   chan RequestVoteResponse
 }
-
 
 func newPeerSet() *PeerSet {
 	return &PeerSet{
