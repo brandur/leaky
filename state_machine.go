@@ -39,7 +39,7 @@ const (
 )
 
 type StateMachine struct {
-	peers *Peers
+	peerSet *PeerSet
 	server *Server
 
 	// operational state
@@ -60,10 +60,10 @@ type StateMachine struct {
 	nextIndex  []int
 }
 
-func newStateMachine(peers *Peers, server *Server) *StateMachine {
+func newStateMachine(peerSet *PeerSet, server *Server) *StateMachine {
     s := &StateMachine{}
 
-	s.peers = peers
+	s.peerSet = peerSet
 	s.server = server
 	s.setState(FOLLOWER)
 
@@ -93,7 +93,7 @@ func (s *StateMachine) runAsCandidate() {
 	for {
 		select {
 		// peers responding to our vote requests
-		case response := <-s.peers.RequestVoteResponseChan:
+		case response := <-s.peerSet.RequestVoteResponseChan:
 			s.votes[response.CandidateName] = true
 			fmt.Printf("num_votes=%v\n", len(s.votes))
 
@@ -158,7 +158,7 @@ func (s *StateMachine) runAsLeader() {
 	for {
 		select {
 		// peers responding to our append entries requests
-		case <-s.peers.AppendEntriesResponseChan:
+		case <-s.peerSet.AppendEntriesResponseChan:
 
 		case <-time.After(HEARTBEAT_TIMEOUT):
 			s.sendHeartbeat()
@@ -168,7 +168,7 @@ func (s *StateMachine) runAsLeader() {
 
 func (s *StateMachine) sendHeartbeat() {
 	request := AppendEntriesRequest{}
-	s.peers.AppendEntriesRequestChan <- request
+	s.peerSet.AppendEntriesRequestChan <- request
 }
 
 func (s *StateMachine) setState(state State) {
@@ -206,5 +206,5 @@ func (s *StateMachine) startElection() {
 		LastLogTerm:   log[s.commitIndex].term,
 	}
 	// request vote from other clients
-	s.peers.RequestVoteRequestChan <- request
+	s.peerSet.RequestVoteRequestChan <- request
 }

@@ -5,12 +5,12 @@ import ()
 func main() {
 	//addLogEntry(LogEntry{term: currentTerm, operation: PUT, data: "foo"})
 
-	peers := newPeers()
-	go peers.run()
+	peerSet := newPeerSet()
+	go peerSet.run()
 
 	server := newServer()
 
-	state := newStateMachine(peers, server)
+	state := newStateMachine(peerSet, server)
 	go state.run()
 
 	server.run()

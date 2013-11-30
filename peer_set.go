@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 )
 
-type Peers struct {
+type PeerSet struct {
 	set []Client
 	AppendEntriesRequestChan  chan AppendEntriesRequest
 	AppendEntriesResponseChan chan AppendEntriesResponse
@@ -13,8 +13,8 @@ type Peers struct {
 }
 
 
-func newPeers() *Peers {
-	return &Peers{
+func newPeerSet() *PeerSet {
+	return &PeerSet{
 		AppendEntriesRequestChan:  make(chan AppendEntriesRequest, 50),
 		AppendEntriesResponseChan: make(chan AppendEntriesResponse, 50),
 		RequestVoteRequestChan:    make(chan RequestVoteRequest, 50),
@@ -22,13 +22,13 @@ func newPeers() *Peers {
 	}
 }
 
-func (p *Peers) broadcast(path string, data []byte, handler func([]byte)) {
+func (p *PeerSet) broadcast(path string, data []byte, handler func([]byte)) {
 	for i := range p.set {
 		go p.set[i].connectAndSend(path, data, handler)
 	}
 }
 
-func (p *Peers) run() {
+func (p *PeerSet) run() {
 	for {
 		select {
 		case request := <-p.AppendEntriesRequestChan:
@@ -48,13 +48,13 @@ func (p *Peers) run() {
 	}
 }
 
-func (p *Peers) buildHandler(handler func(*Peers, []byte)) func([]byte) {
+func (p *PeerSet) buildHandler(handler func(*PeerSet, []byte)) func([]byte) {
 	return func(responseData []byte) {
 		handler(p, responseData)
 	}
 }
 
-func handleAppendEntriesResponse(p *Peers, responseData []byte) {
+func handleAppendEntriesResponse(p *PeerSet, responseData []byte) {
 	response := AppendEntriesResponse{}
 	if err := json.Unmarshal(responseData, &response); err != nil {
 		panic(err)
@@ -62,7 +62,7 @@ func handleAppendEntriesResponse(p *Peers, responseData []byte) {
 	p.AppendEntriesResponseChan <- response
 }
 
-func handleRequestVoteResponse(p *Peers, responseData []byte) {
+func handleRequestVoteResponse(p *PeerSet, responseData []byte) {
 	response := RequestVoteResponse{}
 	if err := json.Unmarshal(responseData, &response); err != nil {
 		panic(err)
