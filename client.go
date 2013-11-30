@@ -2,56 +2,26 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 )
 
-var (
-	clients Server
-)
+type Client struct {
+	Url string
+}
 
-func RunClient() {
-	for {
-		select {
-		case request := <-clients.AppendEntriesRequestChan:
-			requestData, err := json.Marshal(request)
-			if err != nil {
-				panic(err)
-			}
-			broadcast("/append-entries", requestData, handleAppendEntriesResponse)
-
-		case request := <-clients.RequestVoteRequestChan:
-			requestData, err := json.Marshal(request)
-			if err != nil {
-				panic(err)
-			}
-			broadcast("/request-vote", requestData, handleRequestVoteResponse)
-		}
+func newClient(url string) *Client {
+	return &Client{
+		Url: url,
 	}
 }
 
-func init() {
-	clients = Server{
-		AppendEntriesRequestChan:  make(chan AppendEntriesRequest, 50),
-		AppendEntriesResponseChan: make(chan AppendEntriesResponse, 50),
-		RequestVoteRequestChan:    make(chan RequestVoteRequest, 50),
-		RequestVoteResponseChan:   make(chan RequestVoteResponse, 50),
-	}
-}
-
-func broadcast(path string, data []byte, handler func([]byte)) {
-	for i := range conf.peerUrls {
-		go connectAndSend(conf.peerUrls[i], path, data, handler)
-	}
-}
-
-func connectAndSend(url string, path string, data []byte, handler func([]byte)) {
+func (c *Client) connectAndSend(path string, data []byte, handler func([]byte)) {
 	buffer := bytes.NewBuffer(data)
-	r, err := http.Post(url+path, "application/json", buffer)
+	r, err := http.Post(c.Url+path, "application/json", buffer)
 	if err != nil {
-		fmt.Printf("send_error peer_url=%v err=\"%v\"", url, err)
+		fmt.Printf("send_error peer_url=%v err=\"%v\"", c.Url, err)
 		return
 	}
 
@@ -61,20 +31,4 @@ func connectAndSend(url string, path string, data []byte, handler func([]byte)) 
 	}
 
 	handler(responseData)
-}
-
-func handleAppendEntriesResponse(responseData []byte) {
-	response := AppendEntriesResponse{}
-	if err := json.Unmarshal(responseData, &response); err != nil {
-		panic(err)
-	}
-	clients.AppendEntriesResponseChan <- response
-}
-
-func handleRequestVoteResponse(responseData []byte) {
-	response := RequestVoteResponse{}
-	if err := json.Unmarshal(responseData, &response); err != nil {
-		panic(err)
-	}
-	clients.RequestVoteResponseChan <- response
 }
