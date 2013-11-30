@@ -28,26 +28,6 @@ func (p *PeerSet) broadcast(path string, data []byte, handler func([]byte)) {
 	}
 }
 
-func (p *PeerSet) run() {
-	for {
-		select {
-		case request := <-p.AppendEntriesRequestChan:
-			requestData, err := json.Marshal(request)
-			if err != nil {
-				panic(err)
-			}
-			p.broadcast("/append-entries", requestData, p.buildHandler(handleAppendEntriesResponse))
-
-		case request := <-p.RequestVoteRequestChan:
-			requestData, err := json.Marshal(request)
-			if err != nil {
-				panic(err)
-			}
-			p.broadcast("/request-vote", requestData, p.buildHandler(handleRequestVoteResponse))
-		}
-	}
-}
-
 func (p *PeerSet) buildHandler(handler func(*PeerSet, []byte)) func([]byte) {
 	return func(responseData []byte) {
 		handler(p, responseData)
@@ -68,4 +48,24 @@ func handleRequestVoteResponse(p *PeerSet, responseData []byte) {
 		panic(err)
 	}
 	p.RequestVoteResponseChan <- response
+}
+
+func (p *PeerSet) run() {
+	for {
+		select {
+		case request := <-p.AppendEntriesRequestChan:
+			requestData, err := json.Marshal(request)
+			if err != nil {
+				panic(err)
+			}
+			p.broadcast("/append-entries", requestData, p.buildHandler(handleAppendEntriesResponse))
+
+		case request := <-p.RequestVoteRequestChan:
+			requestData, err := json.Marshal(request)
+			if err != nil {
+				panic(err)
+			}
+			p.broadcast("/request-vote", requestData, p.buildHandler(handleRequestVoteResponse))
+		}
+	}
 }
