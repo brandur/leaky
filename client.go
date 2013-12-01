@@ -26,7 +26,7 @@ func (c *Client) buildHandler(handler func(*Client, []byte)) func([]byte) {
 	}
 }
 
-func (c *Client) send(path string, data []byte, handler func([]byte)) {
+func (c *Client) sendData(path string, data []byte, handler func([]byte)) {
 	buffer := bytes.NewBuffer(data)
 	r, err := http.Post(c.Url+path, "application/json", buffer)
 	if err != nil {
@@ -40,6 +40,14 @@ func (c *Client) send(path string, data []byte, handler func([]byte)) {
 	}
 
 	handler(responseData)
+}
+
+func (c *Client) sendRequest(path string, request interface{}) {
+	requestData, err := json.Marshal(request)
+	if err != nil {
+		panic(err)
+	}
+	c.sendData(path, requestData, c.buildHandler(handleAppendEntriesResponse))
 }
 
 func handleAppendEntriesResponse(c *Client, responseData []byte) {
@@ -56,20 +64,4 @@ func handleRequestVoteResponse(c *Client, responseData []byte) {
 		panic(err)
 	}
 	c.PeerSet.RequestVoteResponseChan <- response
-}
-
-func (c *Client) sendAppendEntriesRequest(request *AppendEntriesRequest) {
-	requestData, err := json.Marshal(request)
-	if err != nil {
-		panic(err)
-	}
-	c.send("/append-entries", requestData, c.buildHandler(handleAppendEntriesResponse))
-}
-
-func (c *Client) sendRequestVoteRequest(request *RequestVoteRequest) {
-	requestData, err := json.Marshal(request)
-	if err != nil {
-		panic(err)
-	}
-	c.send("/request-vote", requestData, c.buildHandler(handleRequestVoteResponse))
 }

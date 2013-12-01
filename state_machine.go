@@ -2,32 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/nu7hatch/gouuid"
 	"time"
 )
 
-type Name string
-
 type State string
-
-type AppendEntriesRequest struct {
-}
-
-type AppendEntriesResponse struct {
-}
-
-type RequestVoteRequest struct {
-	CandidateName Name `json:"candidateName"`
-	Term          int  `json:"term"`
-	LastLogIndex  int  `json:"lastLogIndex"`
-	LastLogTerm   int  `json:"lastLogTerm"`
-}
-
-type RequestVoteResponse struct {
-	CandidateName Name `json:"candidateName"`
-	Term          int  `json:"term"`
-	VoteGranted   bool `json:"voteGranted"`
-}
 
 const (
 	ELECTION_TIMEOUT  time.Duration = 2 * time.Second
@@ -60,19 +38,15 @@ type StateMachine struct {
 	nextIndex  []int
 }
 
-func newStateMachine(peerSet *PeerSet, server *Server) *StateMachine {
+func newStateMachine(name Name, peerSet *PeerSet, server *Server) *StateMachine {
 	s := &StateMachine{}
 
+	s.name = name
 	s.peerSet = peerSet
 	s.server = server
+
 	s.setState(FOLLOWER)
 
-	id, err := uuid.NewV4()
-	if err != nil {
-		panic(err)
-	}
-	s.name = Name("leaky-" + id.String())
-	fmt.Printf("name=%v\n", s.name)
 	return s
 }
 
@@ -121,6 +95,10 @@ func (s *StateMachine) runAsFollower() {
 		select {
 		// leader requesting an append entries
 		case <-s.server.AppendEntriesRequestChan:
+
+		// got a join response back; do nothing, but expect a heartbeat from
+		// here
+		case <-s.peerSet.JoinResponseChan:
 
 		// peers requesting votes
 		case request := <-s.server.RequestVoteRequestChan:

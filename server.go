@@ -12,6 +12,8 @@ import (
 type Server struct {
 	AppendEntriesRequestChan  chan AppendEntriesRequest
 	AppendEntriesResponseChan chan AppendEntriesResponse
+	JoinRequestChan  chan JoinRequest
+	JoinResponseChan chan JoinResponse
 	RequestVoteRequestChan    chan RequestVoteRequest
 	RequestVoteResponseChan   chan RequestVoteResponse
 }
@@ -22,10 +24,12 @@ type ServerError struct {
 
 func newServer() *Server {
 	return &Server{
-		AppendEntriesRequestChan:  make(chan AppendEntriesRequest),
-		AppendEntriesResponseChan: make(chan AppendEntriesResponse),
-		RequestVoteRequestChan:    make(chan RequestVoteRequest),
-		RequestVoteResponseChan:   make(chan RequestVoteResponse),
+		AppendEntriesRequestChan:  make(chan AppendEntriesRequest, 50),
+		AppendEntriesResponseChan: make(chan AppendEntriesResponse, 50),
+		JoinRequestChan: make(chan JoinRequest, 50),
+		JoinResponseChan: make(chan JoinResponse, 50),
+		RequestVoteRequestChan:    make(chan RequestVoteRequest, 50),
+		RequestVoteResponseChan:   make(chan RequestVoteResponse, 50),
 	}
 }
 
@@ -56,6 +60,22 @@ func handleAppendEntries(s *Server, requestData []byte) ([]byte, error) {
 
 	s.AppendEntriesRequestChan <- request
 	response := <-s.AppendEntriesResponseChan
+
+	responseData, err := json.Marshal(response)
+	if err != nil {
+		return nil, err
+	}
+	return responseData, nil
+}
+
+func handleJoin(s *Server, requestData []byte) ([]byte, error) {
+	request := JoinRequest{}
+	if err := json.Unmarshal(requestData, &request); err != nil {
+		return nil, err
+	}
+
+	s.JoinRequestChan <- request
+	response := <-s.JoinResponseChan
 
 	responseData, err := json.Marshal(response)
 	if err != nil {
@@ -96,6 +116,7 @@ func (s *Server) encodeError(err error) string {
 func (s *Server) initRouter() *pat.Router {
 	router := pat.New()
 	router.Post("/append-entries", s.buildHandler(handleAppendEntries))
+	router.Post("/join", s.buildHandler(handleJoin))
 	router.Post("/request-vote", s.buildHandler(handleRequestVote))
 	return router
 }

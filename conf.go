@@ -26,5 +26,5 @@ func init() {
 	if conf.http == "" {
 		conf.http = ":3131"
 	}
-	conf.peerUrl = envRequired("PEER_URL")
+	conf.peerUrl = os.Getenv("PEER_URL")
 }
